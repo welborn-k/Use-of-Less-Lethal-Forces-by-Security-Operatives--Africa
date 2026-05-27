@@ -1,0 +1,1162 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/L.Control.Locate.min.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/MarkerCluster.css">
+        <link rel="stylesheet" href="css/MarkerCluster.Default.css">
+        <link rel="stylesheet" href="css/leaflet-search.css">
+        <link rel="stylesheet" href="css/filter.css">
+<link rel="stylesheet" href="css/nouislider.min.css">
+        <link rel="stylesheet" href="css/leaflet.photon.css">
+        <link rel="stylesheet" href="css/leaflet-measure.css">
+        <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        </style>
+        <title></title>
+    </head>
+    <body>
+        <div id="map">
+        </div>
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/L.Control.Locate.min.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet.photon.js"></script>
+        <script src="js/leaflet-measure.js"></script>
+        <script src="js/leaflet.markercluster.js"></script>
+        <script src="js/leaflet-search.js"></script>
+        <script src="js/tailDT.js"></script>
+<script src="js/nouislider.min.js"></script>
+<script src="js/wNumb.js"></script>
+        <script src="data/customgeo_1.js"></script>
+        <script src="data/LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2.js"></script>
+        <script>
+        var highlightLayer;
+        function highlightFeature(e) {
+            highlightLayer = e.target;
+            highlightLayer.openPopup();
+        }
+        var map = L.map('map', {
+            zoomControl:false, maxZoom:28, minZoom:1
+        }).fitBounds([[-45.83168509523735,-60.17689388421438],[44.083778810522155,118.59677472349657]]);
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/qgis2web/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // modify popup if contains media
+        function addClassToPopupIfMedia(content, popup) {
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            var imgTd = tempDiv.querySelector('td img');
+            if (imgTd) {
+                var src = imgTd.getAttribute('src');
+                if (/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i.test(src)) {
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp3|wav|ogg|aac)$/i.test(src)) {
+                    var audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = src;
+                    imgTd.parentNode.replaceChild(audio, imgTd);
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp4|webm|ogg|mov)$/i.test(src)) {
+                    var video = document.createElement('video');
+                    video.controls = true;
+                    video.src = src;
+                    video.style.width = "400px";
+                    video.style.height = "300px";
+                    video.style.maxHeight = "60vh";
+                    video.style.maxWidth = "60vw";
+                    imgTd.parentNode.replaceChild(video, imgTd);
+                    popup._contentNode.classList.add('media');
+                    // Aggiorna il popup quando il video carica i metadati
+                    video.addEventListener('loadedmetadata', function() {
+                        popup.update();
+                    });
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else {
+                    popup._contentNode.classList.remove('media');
+                }
+            } else {
+                popup._contentNode.classList.remove('media');
+            }
+        }
+        var zoomControl = L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
+        L.control.locate({locateOptions: {maxZoom: 19}}).addTo(map);
+        var measureControl = new L.Control.Measure({
+            position: 'topleft',
+            primaryLengthUnit: 'meters',
+            secondaryLengthUnit: 'kilometers',
+            primaryAreaUnit: 'sqmeters',
+            secondaryAreaUnit: 'hectares'
+        });
+        measureControl.addTo(map);
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].innerHTML = '';
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].className += ' fas fa-ruler';
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+        }
+        map.createPane('pane_OpenStreetMap_0');
+        map.getPane('pane_OpenStreetMap_0').style.zIndex = 400;
+        var layer_OpenStreetMap_0 = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            pane: 'pane_OpenStreetMap_0',
+            opacity: 1.0,
+            attribution: '',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 19
+        });
+        layer_OpenStreetMap_0;
+        map.addLayer(layer_OpenStreetMap_0);
+        function pop_customgeo_1(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['featurecla'] !== null ? autolinker.link(String(feature.properties['featurecla']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['scalerank'] !== null ? autolinker.link(String(feature.properties['scalerank']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['labelrank'] !== null ? autolinker.link(String(feature.properties['labelrank']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['sovereignt'] !== null ? autolinker.link(String(feature.properties['sovereignt']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['sov_a3'] !== null ? autolinker.link(String(feature.properties['sov_a3']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_dif'] !== null ? autolinker.link(String(feature.properties['adm0_dif']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['level'] !== null ? autolinker.link(String(feature.properties['level']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['type'] !== null ? autolinker.link(String(feature.properties['type']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tlc'] !== null ? autolinker.link(String(feature.properties['tlc']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['admin'] !== null ? autolinker.link(String(feature.properties['admin']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3'] !== null ? autolinker.link(String(feature.properties['adm0_a3']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['geou_dif'] !== null ? autolinker.link(String(feature.properties['geou_dif']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['geounit'] !== null ? autolinker.link(String(feature.properties['geounit']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['gu_a3'] !== null ? autolinker.link(String(feature.properties['gu_a3']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['su_dif'] !== null ? autolinker.link(String(feature.properties['su_dif']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['subunit'] !== null ? autolinker.link(String(feature.properties['subunit']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['su_a3'] !== null ? autolinker.link(String(feature.properties['su_a3']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['brk_diff'] !== null ? autolinker.link(String(feature.properties['brk_diff']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_long'] !== null ? autolinker.link(String(feature.properties['name_long']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['brk_a3'] !== null ? autolinker.link(String(feature.properties['brk_a3']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['brk_name'] !== null ? autolinker.link(String(feature.properties['brk_name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['brk_group'] !== null ? autolinker.link(String(feature.properties['brk_group']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['abbrev'] !== null ? autolinker.link(String(feature.properties['abbrev']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['postal'] !== null ? autolinker.link(String(feature.properties['postal']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['formal_en'] !== null ? autolinker.link(String(feature.properties['formal_en']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['formal_fr'] !== null ? autolinker.link(String(feature.properties['formal_fr']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_ciawf'] !== null ? autolinker.link(String(feature.properties['name_ciawf']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['note_adm0'] !== null ? autolinker.link(String(feature.properties['note_adm0']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['note_brk'] !== null ? autolinker.link(String(feature.properties['note_brk']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_sort'] !== null ? autolinker.link(String(feature.properties['name_sort']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_alt'] !== null ? autolinker.link(String(feature.properties['name_alt']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['mapcolor7'] !== null ? autolinker.link(String(feature.properties['mapcolor7']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['mapcolor8'] !== null ? autolinker.link(String(feature.properties['mapcolor8']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['mapcolor9'] !== null ? autolinker.link(String(feature.properties['mapcolor9']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['mapcolor13'] !== null ? autolinker.link(String(feature.properties['mapcolor13']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['pop_est'] !== null ? autolinker.link(String(feature.properties['pop_est']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['pop_rank'] !== null ? autolinker.link(String(feature.properties['pop_rank']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['pop_year'] !== null ? autolinker.link(String(feature.properties['pop_year']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['gdp_md'] !== null ? autolinker.link(String(feature.properties['gdp_md']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['gdp_year'] !== null ? autolinker.link(String(feature.properties['gdp_year']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['economy'] !== null ? autolinker.link(String(feature.properties['economy']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['income_grp'] !== null ? autolinker.link(String(feature.properties['income_grp']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fips_10'] !== null ? autolinker.link(String(feature.properties['fips_10']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['iso_a2'] !== null ? autolinker.link(String(feature.properties['iso_a2']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['iso_a2_eh'] !== null ? autolinker.link(String(feature.properties['iso_a2_eh']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['iso_a3'] !== null ? autolinker.link(String(feature.properties['iso_a3']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['iso_a3_eh'] !== null ? autolinker.link(String(feature.properties['iso_a3_eh']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['iso_n3'] !== null ? autolinker.link(String(feature.properties['iso_n3']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['iso_n3_eh'] !== null ? autolinker.link(String(feature.properties['iso_n3_eh']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['un_a3'] !== null ? autolinker.link(String(feature.properties['un_a3']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['wb_a2'] !== null ? autolinker.link(String(feature.properties['wb_a2']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['wb_a3'] !== null ? autolinker.link(String(feature.properties['wb_a3']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['woe_id'] !== null ? autolinker.link(String(feature.properties['woe_id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['woe_id_eh'] !== null ? autolinker.link(String(feature.properties['woe_id_eh']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['woe_note'] !== null ? autolinker.link(String(feature.properties['woe_note']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_iso'] !== null ? autolinker.link(String(feature.properties['adm0_iso']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_diff'] !== null ? autolinker.link(String(feature.properties['adm0_diff']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_tlc'] !== null ? autolinker.link(String(feature.properties['adm0_tlc']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_us'] !== null ? autolinker.link(String(feature.properties['adm0_a3_us']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_fr'] !== null ? autolinker.link(String(feature.properties['adm0_a3_fr']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_ru'] !== null ? autolinker.link(String(feature.properties['adm0_a3_ru']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_es'] !== null ? autolinker.link(String(feature.properties['adm0_a3_es']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_cn'] !== null ? autolinker.link(String(feature.properties['adm0_a3_cn']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_tw'] !== null ? autolinker.link(String(feature.properties['adm0_a3_tw']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_in'] !== null ? autolinker.link(String(feature.properties['adm0_a3_in']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_np'] !== null ? autolinker.link(String(feature.properties['adm0_a3_np']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_pk'] !== null ? autolinker.link(String(feature.properties['adm0_a3_pk']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_de'] !== null ? autolinker.link(String(feature.properties['adm0_a3_de']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_gb'] !== null ? autolinker.link(String(feature.properties['adm0_a3_gb']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_br'] !== null ? autolinker.link(String(feature.properties['adm0_a3_br']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_il'] !== null ? autolinker.link(String(feature.properties['adm0_a3_il']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_ps'] !== null ? autolinker.link(String(feature.properties['adm0_a3_ps']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_sa'] !== null ? autolinker.link(String(feature.properties['adm0_a3_sa']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_eg'] !== null ? autolinker.link(String(feature.properties['adm0_a3_eg']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_ma'] !== null ? autolinker.link(String(feature.properties['adm0_a3_ma']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_pt'] !== null ? autolinker.link(String(feature.properties['adm0_a3_pt']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_ar'] !== null ? autolinker.link(String(feature.properties['adm0_a3_ar']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_jp'] !== null ? autolinker.link(String(feature.properties['adm0_a3_jp']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_ko'] !== null ? autolinker.link(String(feature.properties['adm0_a3_ko']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_vn'] !== null ? autolinker.link(String(feature.properties['adm0_a3_vn']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_tr'] !== null ? autolinker.link(String(feature.properties['adm0_a3_tr']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_id'] !== null ? autolinker.link(String(feature.properties['adm0_a3_id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_pl'] !== null ? autolinker.link(String(feature.properties['adm0_a3_pl']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_gr'] !== null ? autolinker.link(String(feature.properties['adm0_a3_gr']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_it'] !== null ? autolinker.link(String(feature.properties['adm0_a3_it']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_nl'] !== null ? autolinker.link(String(feature.properties['adm0_a3_nl']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_se'] !== null ? autolinker.link(String(feature.properties['adm0_a3_se']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_bd'] !== null ? autolinker.link(String(feature.properties['adm0_a3_bd']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_ua'] !== null ? autolinker.link(String(feature.properties['adm0_a3_ua']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_un'] !== null ? autolinker.link(String(feature.properties['adm0_a3_un']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['adm0_a3_wb'] !== null ? autolinker.link(String(feature.properties['adm0_a3_wb']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['continent'] !== null ? autolinker.link(String(feature.properties['continent']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['region_un'] !== null ? autolinker.link(String(feature.properties['region_un']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['subregion'] !== null ? autolinker.link(String(feature.properties['subregion']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['region_wb'] !== null ? autolinker.link(String(feature.properties['region_wb']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_len'] !== null ? autolinker.link(String(feature.properties['name_len']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['long_len'] !== null ? autolinker.link(String(feature.properties['long_len']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['abbrev_len'] !== null ? autolinker.link(String(feature.properties['abbrev_len']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiny'] !== null ? autolinker.link(String(feature.properties['tiny']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['homepart'] !== null ? autolinker.link(String(feature.properties['homepart']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['min_zoom'] !== null ? autolinker.link(String(feature.properties['min_zoom']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['min_label'] !== null ? autolinker.link(String(feature.properties['min_label']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['max_label'] !== null ? autolinker.link(String(feature.properties['max_label']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['label_x'] !== null ? autolinker.link(String(feature.properties['label_x']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['label_y'] !== null ? autolinker.link(String(feature.properties['label_y']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['ne_id'] !== null ? autolinker.link(String(feature.properties['ne_id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['wikidataid'] !== null ? autolinker.link(String(feature.properties['wikidataid']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_ar'] !== null ? autolinker.link(String(feature.properties['name_ar']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_bn'] !== null ? autolinker.link(String(feature.properties['name_bn']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_de'] !== null ? autolinker.link(String(feature.properties['name_de']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_en'] !== null ? autolinker.link(String(feature.properties['name_en']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_es'] !== null ? autolinker.link(String(feature.properties['name_es']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_fa'] !== null ? autolinker.link(String(feature.properties['name_fa']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_fr'] !== null ? autolinker.link(String(feature.properties['name_fr']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_el'] !== null ? autolinker.link(String(feature.properties['name_el']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_he'] !== null ? autolinker.link(String(feature.properties['name_he']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_hi'] !== null ? autolinker.link(String(feature.properties['name_hi']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_hu'] !== null ? autolinker.link(String(feature.properties['name_hu']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_id'] !== null ? autolinker.link(String(feature.properties['name_id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_it'] !== null ? autolinker.link(String(feature.properties['name_it']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_ja'] !== null ? autolinker.link(String(feature.properties['name_ja']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_ko'] !== null ? autolinker.link(String(feature.properties['name_ko']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_nl'] !== null ? autolinker.link(String(feature.properties['name_nl']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_pl'] !== null ? autolinker.link(String(feature.properties['name_pl']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_pt'] !== null ? autolinker.link(String(feature.properties['name_pt']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_ru'] !== null ? autolinker.link(String(feature.properties['name_ru']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_sv'] !== null ? autolinker.link(String(feature.properties['name_sv']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_tr'] !== null ? autolinker.link(String(feature.properties['name_tr']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_uk'] !== null ? autolinker.link(String(feature.properties['name_uk']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_ur'] !== null ? autolinker.link(String(feature.properties['name_ur']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_vi'] !== null ? autolinker.link(String(feature.properties['name_vi']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_zh'] !== null ? autolinker.link(String(feature.properties['name_zh']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name_zht'] !== null ? autolinker.link(String(feature.properties['name_zht']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_iso'] !== null ? autolinker.link(String(feature.properties['fclass_iso']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tlc_diff'] !== null ? autolinker.link(String(feature.properties['tlc_diff']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_tlc'] !== null ? autolinker.link(String(feature.properties['fclass_tlc']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_us'] !== null ? autolinker.link(String(feature.properties['fclass_us']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_fr'] !== null ? autolinker.link(String(feature.properties['fclass_fr']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_ru'] !== null ? autolinker.link(String(feature.properties['fclass_ru']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_es'] !== null ? autolinker.link(String(feature.properties['fclass_es']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_cn'] !== null ? autolinker.link(String(feature.properties['fclass_cn']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_tw'] !== null ? autolinker.link(String(feature.properties['fclass_tw']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_in'] !== null ? autolinker.link(String(feature.properties['fclass_in']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_np'] !== null ? autolinker.link(String(feature.properties['fclass_np']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_pk'] !== null ? autolinker.link(String(feature.properties['fclass_pk']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_de'] !== null ? autolinker.link(String(feature.properties['fclass_de']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_gb'] !== null ? autolinker.link(String(feature.properties['fclass_gb']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_br'] !== null ? autolinker.link(String(feature.properties['fclass_br']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_il'] !== null ? autolinker.link(String(feature.properties['fclass_il']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_ps'] !== null ? autolinker.link(String(feature.properties['fclass_ps']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_sa'] !== null ? autolinker.link(String(feature.properties['fclass_sa']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_eg'] !== null ? autolinker.link(String(feature.properties['fclass_eg']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_ma'] !== null ? autolinker.link(String(feature.properties['fclass_ma']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_pt'] !== null ? autolinker.link(String(feature.properties['fclass_pt']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_ar'] !== null ? autolinker.link(String(feature.properties['fclass_ar']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_jp'] !== null ? autolinker.link(String(feature.properties['fclass_jp']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_ko'] !== null ? autolinker.link(String(feature.properties['fclass_ko']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_vn'] !== null ? autolinker.link(String(feature.properties['fclass_vn']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_tr'] !== null ? autolinker.link(String(feature.properties['fclass_tr']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_id'] !== null ? autolinker.link(String(feature.properties['fclass_id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_pl'] !== null ? autolinker.link(String(feature.properties['fclass_pl']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_gr'] !== null ? autolinker.link(String(feature.properties['fclass_gr']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_it'] !== null ? autolinker.link(String(feature.properties['fclass_it']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_nl'] !== null ? autolinker.link(String(feature.properties['fclass_nl']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_se'] !== null ? autolinker.link(String(feature.properties['fclass_se']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_bd'] !== null ? autolinker.link(String(feature.properties['fclass_bd']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass_ua'] !== null ? autolinker.link(String(feature.properties['fclass_ua']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['filename'] !== null ? autolinker.link(String(feature.properties['filename']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_customgeo_1_0() {
+            return {
+                pane: 'pane_customgeo_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(145,82,45,0.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_customgeo_1');
+        map.getPane('pane_customgeo_1').style.zIndex = 401;
+        map.getPane('pane_customgeo_1').style['mix-blend-mode'] = 'normal';
+        var layer_customgeo_1 = new L.geoJson(json_customgeo_1, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_customgeo_1',
+            layerName: 'layer_customgeo_1',
+            pane: 'pane_customgeo_1',
+            onEachFeature: pop_customgeo_1,
+            style: style_customgeo_1_0,
+        });
+        bounds_group.addLayer(layer_customgeo_1);
+        map.addLayer(layer_customgeo_1);
+        function pop_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2"><strong>Munition Name</strong><br />' + (feature.properties['Munition Name'] !== null ? autolinker.link(String(feature.properties['Munition Name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Links'] !== null ? autolinker.link(String(feature.properties['Links']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Classification'] !== null ? autolinker.link(String(feature.properties['Classification']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2"><strong>Country being Used</strong><br />' + (feature.properties['Country being Used'] !== null ? autolinker.link(String(feature.properties['Country being Used']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2"><strong>Manufactured by</strong><br />' + (feature.properties['Manufactured by'] !== null ? autolinker.link(String(feature.properties['Manufactured by']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2"><strong>Country of Origin</strong><br />' + (feature.properties['Country of Origin'] !== null ? autolinker.link(String(feature.properties['Country of Origin']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2_0() {
+            return {
+                pane: 'pane_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2',
+                radius: 8.0,
+                opacity: 1,
+                color: 'rgba(255,255,255,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(227,26,28,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2');
+        map.getPane('pane_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2').style.zIndex = 402;
+        map.getPane('pane_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2').style['mix-blend-mode'] = 'normal';
+        var layer_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2 = new L.geoJson(json_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2',
+            layerName: 'layer_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2',
+            pane: 'pane_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2',
+            onEachFeature: pop_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2_0(feature));
+            },
+        });
+        var cluster_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2 = new L.MarkerClusterGroup({showCoverageOnHover: false,
+            spiderfyDistanceMultiplier: 2});
+        cluster_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2.addLayer(layer_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2);
+
+        bounds_group.addLayer(layer_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2);
+        cluster_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2.addTo(map);
+        const url = {"Nominatim OSM": "https://nominatim.openstreetmap.org/search?format=geojson&addressdetails=1&",
+        "France BAN": "https://api-adresse.data.gouv.fr/search/?"}
+        var photonControl = L.control.photon({
+            url: url["Nominatim OSM"],
+            feedbackLabel: '',
+            position: 'topleft',
+            includePosition: true,
+            initial: true,
+            // resultsHandler: myHandler,
+        }).addTo(map);
+        photonControl._container.childNodes[0].style.borderRadius="10px"
+        // Create a variable to store the geoJSON data
+        var x = null;
+        // Create a variable to store the marker
+        var marker = null;
+        // Add an event listener to the Photon control to create a marker from the returned geoJSON data
+        var z = null;
+        photonControl.on('selected', function(e) {
+            console.log(photonControl.search.resultsContainer);
+            if (x != null) {
+                map.removeLayer(obj3.marker);
+                map.removeLayer(x);
+            }
+            obj2.gcd = e.choice;
+            x = L.geoJSON(obj2.gcd).addTo(map);
+            var label = typeof obj2.gcd.properties.label === 'undefined' ? obj2.gcd.properties.display_name : obj2.gcd.properties.label;
+            obj3.marker = L.marker(x.getLayers()[0].getLatLng()).bindPopup(label).addTo(map);
+            map.setView(x.getLayers()[0].getLatLng(), 17);
+            z = typeof e.choice.properties.label === 'undefined'? e.choice.properties.display_name : e.choice.properties.label;
+            console.log(e);
+            e.target.input.value = z;
+        });
+        var search = document.getElementsByClassName("leaflet-photon leaflet-control")[0];
+        search.classList.add("leaflet-control-search")
+        search.style.display = "flex";
+        search.style.backgroundColor="rgba(255,255,255,0.5)" 
+
+        // Create the new button element
+        var button = document.createElement("div");
+        button.id = "gcd-button-control";
+        button.className = "gcd-gl-btn fa fa-search search-button";
+
+        // Insert the button at the beginning of the search control
+        search.insertBefore(button, search.firstChild);
+        last = search.lastChild;
+        last.style.display = "none";
+        button.addEventListener("click", function (e) {
+            if (last.style.display === "none") {
+                last.style.display = "block";
+            } else {
+                last.style.display = "none";
+            }
+        });
+        var overlaysTree = [
+            {label: '<img src="legend/LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2.png" /> Less Lethal Weapons Used by Security Forces During Protests and Crackdown within Africa ', layer: cluster_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2},
+        {label: '<b>custom.geo</b>',  selectAllCheckbox: true, children: [
+            {label: '<img src="legend/customgeo_1.png" /> custom.geo', layer: layer_customgeo_1},]},
+            {label: "OpenStreetMap", layer: layer_OpenStreetMap_0, radioGroup: 'bm' },]
+        var lay = L.control.layers.tree(null, overlaysTree,{
+            //namedToggle: true,
+            //selectorBack: false,
+            //closedSymbol: '&#8862; &#x1f5c0;',
+            //openedSymbol: '&#8863; &#x1f5c1;',
+            //collapseAll: 'Collapse all',
+            //expandAll: 'Expand all',
+            collapsed: false, 
+        });
+        lay.addTo(map);
+		document.addEventListener("DOMContentLoaded", function() {
+            // set new Layers List height which considers toggle icon
+            function newLayersListHeight() {
+                var layerScrollbarElement = document.querySelector('.leaflet-control-layers-scrollbar');
+                if (layerScrollbarElement) {
+                    var layersListElement = document.querySelector('.leaflet-control-layers-list');
+                    var originalHeight = layersListElement.style.height 
+                        || window.getComputedStyle(layersListElement).height;
+                    var newHeight = parseFloat(originalHeight) - 50;
+                    layersListElement.style.height = newHeight + 'px';
+                }
+            }
+            var isLayersListExpanded = true;
+            var controlLayersElement = document.querySelector('.leaflet-control-layers');
+            var toggleLayerControl = document.querySelector('.leaflet-control-layers-toggle');
+            // toggle Collapsed/Expanded and apply new Layers List height
+            toggleLayerControl.addEventListener('click', function() {
+                if (isLayersListExpanded) {
+                    controlLayersElement.classList.remove('leaflet-control-layers-expanded');
+                } else {
+                    controlLayersElement.classList.add('leaflet-control-layers-expanded');
+                }
+                isLayersListExpanded = !isLayersListExpanded;
+                newLayersListHeight()
+            });	
+			// apply new Layers List height if toggle layerstree
+			if (controlLayersElement) {
+				controlLayersElement.addEventListener('click', function(event) {
+					var toggleLayerHeaderPointer = event.target.closest('.leaflet-layerstree-header-pointer span');
+					if (toggleLayerHeaderPointer) {
+						newLayersListHeight();
+					}
+				});
+			}
+            // Collapsed/Expanded at Start to apply new height
+            setTimeout(function() {
+                toggleLayerControl.click();
+            }, 10);
+            setTimeout(function() {
+                toggleLayerControl.click();
+            }, 10);
+            // Collapsed touch/small screen
+            var isSmallScreen = window.innerWidth < 650;
+            if (isSmallScreen) {
+                setTimeout(function() {
+                    controlLayersElement.classList.remove('leaflet-control-layers-expanded');
+                    isLayersListExpanded = !isLayersListExpanded;
+                }, 500);
+            }  
+        });       
+        setBounds();
+        map.addControl(new L.Control.Search({
+            layer: cluster_LessLethalAfrica_2,
+            initial: false,
+            hideMarkerOnCollapse: true,
+            propertyName: 'Country of Origin'}));
+        if (typeof url === 'undefined') {
+            document.getElementsByClassName('search-button')[0].className += ' fa fa-binoculars';
+        } else {
+            document.getElementsByClassName('search-button')[1].className += ' fa fa-binoculars';
+        }
+        var mapDiv = document.getElementById('map');
+        var row = document.createElement('div');
+        row.className="row";
+        row.id="all";
+        row.style.height = "100%";
+        var col1 = document.createElement('div');
+        col1.className="col9";
+        col1.id = "mapWindow";
+        col1.style.height = "99%";
+        col1.style.width = "80%";
+        col1.style.display = "inline-block";
+        var col2 = document.createElement('div');
+        col2.className="col3";
+        col2.id = "menu";
+        col2.style.display = "inline-block";
+        mapDiv.parentNode.insertBefore(row, mapDiv);
+        document.getElementById("all").appendChild(col1);
+        document.getElementById("all").appendChild(col2);
+        col1.appendChild(mapDiv)
+        var Filters = {"Long": "real","Manufactured by": "str","Country of Origin": "str"};
+        function filterFunc() {
+          map.eachLayer(function(lyr){
+          if ("options" in lyr && "dataVar" in lyr["options"]){
+            features = this[lyr["options"]["dataVar"]].features.slice(0);
+            try{
+              for (key in Filters){
+                keyS = key.replace(/[^a-zA-Z0-9_]/g, "")
+                if (Filters[key] == "str" || Filters[key] == "bool"){
+                  var selection = [];
+                  var options = document.getElementById("sel_" + keyS).options
+                  for (var i=0; i < options.length; i++) {
+                    if (options[i].selected) selection.push(options[i].value);
+                  }
+                    try{
+                      if (key in features[0].properties){
+                        for (i = features.length - 1;
+                          i >= 0; --i){
+                          if (selection.indexOf(
+                          features[i].properties[key])<0
+                          && selection.length>0) {
+                          features.splice(i,1);
+                          }
+                        }
+                      }
+                    } catch(err){
+                  }
+                }
+                if (Filters[key] == "int"){
+                  sliderVals =  document.getElementById(
+                    "div_" + keyS).noUiSlider.get();
+                  try{
+                    if (key in features[0].properties){
+                    for (i = features.length - 1; i >= 0; --i){
+                      if (parseInt(features[i].properties[key])
+                          < sliderVals[0]
+                          || parseInt(features[i].properties[key])
+                          > sliderVals[1]){
+                            features.splice(i,1);
+                          }
+                        }
+                      }
+                    } catch(err){
+                    }
+                  }
+                if (Filters[key] == "real"){
+                  sliderVals =  document.getElementById(
+                    "div_" + keyS).noUiSlider.get();
+                  try{
+                    if (key in features[0].properties){
+                    for (i = features.length - 1; i >= 0; --i){
+                      if (features[i].properties[key]
+                          < sliderVals[0]
+                          || features[i].properties[key]
+                          > sliderVals[1]){
+                            features.splice(i,1);
+                          }
+                        }
+                      }
+                    } catch(err){
+                    }
+                  }
+                if (Filters[key] == "date"
+                  || Filters[key] == "datetime"
+                  || Filters[key] == "time"){
+                  try{
+                    if (key in features[0].properties){
+                      HTMLkey = key.replace(/[&\/\\#,+()$~%.'":*?<>{} ]/g, '');
+                      startdate = document.getElementById("dat_" +
+                        HTMLkey + "_date1").value.replace(" ", "T");
+                      enddate = document.getElementById("dat_" +
+                        HTMLkey + "_date2").value.replace(" ", "T");
+                      for (i = features.length - 1; i >= 0; --i){
+                        if (features[i].properties[key] < startdate
+                          || features[i].properties[key] > enddate){
+                          features.splice(i,1);
+                        }
+                      }
+                    }
+                  } catch(err){
+                  }
+                }
+              }
+            } catch(err){
+            }
+          this[lyr["options"]["layerName"]].clearLayers();
+          this[lyr["options"]["layerName"]].addData(features);
+          }
+          })
+        }
+            document.getElementById("menu").appendChild(
+                document.createElement("div"));
+            var div_Long = document.createElement("div");
+            div_Long.id = "div_Long";
+            div_Long.className = "slider";
+            document.getElementById("menu").appendChild(div_Long);
+            var lab_Long = document.createElement('div');
+            lab_Long.innerHTML  = 'Long: <span id="val_Long"></span>';
+            lab_Long.className = 'filterlabel';
+            document.getElementById("menu").appendChild(lab_Long);
+            var reset_Long = document.createElement('div');
+            reset_Long.innerHTML = 'clear filter';
+            reset_Long.className = 'filterlabel';
+            lab_Long.className = 'filterlabel';
+            reset_Long.onclick = function() {
+                sel_Long.noUiSlider.reset();
+            };
+            document.getElementById("menu").appendChild(reset_Long);
+            var sel_Long = document.getElementById('div_Long');
+            noUiSlider.create(sel_Long, {
+                connect: true,
+                start: [-14.940456, 36.990501],
+                range: {
+                min: -14.940456,
+                max: 36.990501
+                }
+            });
+            sel_Long.noUiSlider.on('update', function (values) {
+            val_Long = document.getElementById('val_Long');
+            val_Long.innerHTML = values.join(' - ');
+                filterFunc()
+            });
+            document.getElementById("menu").appendChild(
+                document.createElement("div"));
+            var div_Manufacturedby = document.createElement('div');
+            div_Manufacturedby.id = "div_Manufacturedby";
+            div_Manufacturedby.className= "filterselect";
+            document.getElementById("menu").appendChild(div_Manufacturedby);
+            sel_Manufacturedby = document.createElement('select');
+            sel_Manufacturedby.multiple = true;
+            sel_Manufacturedby.size = 10;
+            sel_Manufacturedby.id = "sel_Manufacturedby";
+            var Manufacturedby_options_str = "<option value='' unselected></option>";
+            sel_Manufacturedby.onchange = function(){filterFunc()};
+            Manufacturedby_options_str  += '<option value="Combine Tactical System (CTS)">Combine Tactical System (CTS)</option>';
+            Manufacturedby_options_str  += '<option value="Condor Non-Lethal Technologies Brazil">Condor Non-Lethal Technologies Brazil</option>';
+            Manufacturedby_options_str  += '<option value="Condor Non-Lethal Techonologies">Condor Non-Lethal Techonologies</option>';
+            Manufacturedby_options_str  += '<option value="DaeKwang Chemical Coorperation">DaeKwang Chemical Coorperation</option>';
+            Manufacturedby_options_str  += '<option value="DaeKwang Chemical Corporation">DaeKwang Chemical Corporation</option>';
+            Manufacturedby_options_str  += '<option value="DaeKwang Chemical Corporation-SouthKorea">DaeKwang Chemical Corporation-SouthKorea</option>';
+            Manufacturedby_options_str  += '<option value="Defense Technology">Defense Technology</option>';
+            Manufacturedby_options_str  += '<option value="Federal Laboratories Saltsburg">Federal Laboratories Saltsburg</option>';
+            Manufacturedby_options_str  += '<option value="ICEMAK Ltd -Shophishte">ICEMAK Ltd -Shophishte</option>';
+            Manufacturedby_options_str  += '<option value="ISPRA Ltd ,Zichron">ISPRA Ltd ,Zichron</option>';
+            Manufacturedby_options_str  += '<option value="India">India</option>';
+            Manufacturedby_options_str  += '<option value="Nobel Sport Secirite Ltd">Nobel Sport Secirite Ltd</option>';
+            Manufacturedby_options_str  += '<option value="Non Lethal Technologies -Home City">Non Lethal Technologies -Home City</option>';
+            Manufacturedby_options_str  += '<option value="Rheinmetall Waffe Munition GmbH">Rheinmetall Waffe Munition GmbH</option>';
+            Manufacturedby_options_str  += '<option value="Tear Smoke Unit(TSU) ,BSF TEKANPUR Gwalior">Tear Smoke Unit(TSU) ,BSF TEKANPUR Gwalior</option>';
+            Manufacturedby_options_str  += '<option value="U S A">U S A</option>';
+            Manufacturedby_options_str  += '<option value="XinXin, China">XinXin, China</option>';
+            sel_Manufacturedby.innerHTML = Manufacturedby_options_str;
+            div_Manufacturedby.appendChild(sel_Manufacturedby);
+            var lab_Manufacturedby = document.createElement('div');
+            lab_Manufacturedby.innerHTML = 'Manufactured by';
+            lab_Manufacturedby.className = 'filterlabel';
+            div_Manufacturedby.appendChild(lab_Manufacturedby);
+            var reset_Manufacturedby = document.createElement('div');
+            reset_Manufacturedby.innerHTML = 'clear filter';
+            reset_Manufacturedby.className = 'filterlabel';
+            reset_Manufacturedby.onclick = function() {
+                var options = document.getElementById("sel_Manufacturedby").options;
+                for (var i=0; i < options.length; i++) {
+                    options[i].selected = false;
+                }
+                filterFunc();
+            };
+            div_Manufacturedby.appendChild(reset_Manufacturedby);
+            document.getElementById("menu").appendChild(
+                document.createElement("div"));
+            var div_CountryofOrigin = document.createElement('div');
+            div_CountryofOrigin.id = "div_CountryofOrigin";
+            div_CountryofOrigin.className= "filterselect";
+            document.getElementById("menu").appendChild(div_CountryofOrigin);
+            sel_CountryofOrigin = document.createElement('select');
+            sel_CountryofOrigin.multiple = true;
+            sel_CountryofOrigin.size = 10;
+            sel_CountryofOrigin.id = "sel_CountryofOrigin";
+            var CountryofOrigin_options_str = "<option value='' unselected></option>";
+            sel_CountryofOrigin.onchange = function(){filterFunc()};
+            CountryofOrigin_options_str  += '<option value="Brazil">Brazil</option>';
+            CountryofOrigin_options_str  += '<option value="China">China</option>';
+            CountryofOrigin_options_str  += '<option value="France">France</option>';
+            CountryofOrigin_options_str  += '<option value="Germany">Germany</option>';
+            CountryofOrigin_options_str  += '<option value="India">India</option>';
+            CountryofOrigin_options_str  += '<option value="Isreal">Isreal</option>';
+            CountryofOrigin_options_str  += '<option value="North Macedonia">North Macedonia</option>';
+            CountryofOrigin_options_str  += '<option value="Pennsylvania">Pennsylvania</option>';
+            CountryofOrigin_options_str  += '<option value="South Korea">South Korea</option>';
+            CountryofOrigin_options_str  += '<option value="USA">USA</option>';
+            sel_CountryofOrigin.innerHTML = CountryofOrigin_options_str;
+            div_CountryofOrigin.appendChild(sel_CountryofOrigin);
+            var lab_CountryofOrigin = document.createElement('div');
+            lab_CountryofOrigin.innerHTML = 'Country of Origin';
+            lab_CountryofOrigin.className = 'filterlabel';
+            div_CountryofOrigin.appendChild(lab_CountryofOrigin);
+            var reset_CountryofOrigin = document.createElement('div');
+            reset_CountryofOrigin.innerHTML = 'clear filter';
+            reset_CountryofOrigin.className = 'filterlabel';
+            reset_CountryofOrigin.onclick = function() {
+                var options = document.getElementById("sel_CountryofOrigin").options;
+                for (var i=0; i < options.length; i++) {
+                    options[i].selected = false;
+                }
+                filterFunc();
+            };
+            div_CountryofOrigin.appendChild(reset_CountryofOrigin);
+        resetLabels([layer_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2]);
+        map.on("zoomend", function(){
+            resetLabels([layer_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2]);
+        });
+        map.on("layeradd", function(){
+            resetLabels([layer_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2]);
+        });
+        map.on("layerremove", function(){
+            resetLabels([layer_LessLethalWeaponsUsedbySecurityForcesDuringProtestsandCrackdownwithinAfrica_2]);
+        });
+        </script>        
+    </body>
+</html>
